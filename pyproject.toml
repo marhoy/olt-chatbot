@@ -1,0 +1,57 @@
+[tool.poetry]
+name = "olt-chatbot"
+version = "0.1.0"
+description = ""
+authors = ["Martin Høy <martin.hoy@dnv.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-dotenv = "^1.0.1"
+pydantic = "^2.6.3"
+langchain = "^0.1.11"
+langchain-openai = "^0.0.8"
+streamlit = "^1.31.1"
+loguru = "^0.7.2"
+beautifulsoup4 = "^4.12.3"
+chromadb = "^0.4.24"
+rank-bm25 = "^0.2.2"
+langchainhub = "^0.1.15"
+
+
+[tool.poetry.group.dev.dependencies]
+types-beautifulsoup4 = "^4.12.0.20240229"
+ipykernel = "^6.29.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+# Make isort compatible with black
+[tool.isort]
+profile = "black"
+
+# Mypy configuration
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_ignores = true
+disallow_any_generics = true
+check_untyped_defs = true
+no_implicit_reexport = true
+
+# for strict mypy: (this is the tricky one :-))
+disallow_untyped_defs = true
+
+# Ignore missing stubs from some packages
+[[tool.mypy.overrides]]
+module = ["llm_testing"]
+ignore_missing_imports = true
+
+# Configuration of the pydantic mypy plugin
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
