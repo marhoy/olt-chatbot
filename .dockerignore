@@ -1,0 +1,13 @@
+# Exclude all files
+*
+
+# Include only these files / directories
+!README.md
+!pyproject.toml
+!poetry.lock
+!Dockerfile.*
+!src/
+
+
+# Exclude any __pycache__ directories
+**/__pycache__/

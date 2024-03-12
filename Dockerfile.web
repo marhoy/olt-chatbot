@@ -1,0 +1,63 @@
+FROM python:3.11-slim-bookworm
+
+# These directories will be mounted by ML Factory
+VOLUME /mnt/input
+
+# Define some environment variables
+ENV PIP_NO_CACHE_DIR=true \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies needed to download/install packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    apt-utils \
+    curl \
+    authbind
+
+# We want to run things as a non-privileged user
+ENV USERNAME=user
+ENV PATH="$PATH:/home/$USERNAME/.local/bin:/home/$USERNAME/app/.venv/bin"
+
+# Add user and set up a workdir
+RUN useradd -m $USERNAME -u 12345
+WORKDIR /home/$USERNAME/app
+RUN chown $USERNAME:$USERNAME .
+
+# Allow unprivileged user to run listen on port 80
+RUN touch /etc/authbind/byport/80
+RUN chmod 500 /etc/authbind/byport/80
+RUN chown $USERNAME /etc/authbind/byport/80
+
+# Everything below here runs as a non-privileged user
+USER $USERNAME
+
+# Install poetry
+RUN curl -sSL https://install.python-poetry.org | python - --version 1.8.0
+RUN poetry config virtualenvs.in-project true
+
+# Install runtime dependencies (will be cached)
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --without dev --no-root
+
+# Define docker build arguments, and environment variables that gets populated from the
+# build arguments
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+ENV GIT_BRANCH=${GIT_BRANCH} \
+    GIT_COMMIT=${GIT_COMMIT}
+
+# Copy project files to container
+COPY . .
+
+# Install our own package
+RUN poetry install --only-root
+
+# Environment variables that are Docker-specific
+ENV OUTPUT_DIRECTORY=/mnt/input
+ENV INPUT_DIRECTORY=/mnt/input
+
+# Streamlit theme
+ENV STREAMLIT_THEME_BASE=light
+
+# Run this command
+CMD ["authbind", "streamlit", "run", "--server.port", "80", "src/olt_chatbot/streamlit_chat.py"]

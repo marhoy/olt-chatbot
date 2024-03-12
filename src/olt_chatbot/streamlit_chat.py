@@ -12,8 +12,8 @@ from olt_chatbot.llm_models import LLM_GENERATORS
 
 if __name__ == "__main__":
     logger.info("Starting / rerunning streamlit app")
-    st.set_page_config(page_title="Chat with an LLM", page_icon="🤖")
-    st.title("Chat with an LLM")
+    st.set_page_config(page_title="Olympiatoppen Chatbot", page_icon="🤖")
+    st.title("Olympiatoppen Chatbot")
 
     # Initialize some state variables
     if "llm_name" not in st.session_state:
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         with st.chat_message(msg_type, avatar=avatar):
             st.markdown(message.content)
             if sources := message.additional_kwargs.get("sources", None):
-                st.write(f"Referanser: {", ".join([source for source in sources])}.")
+                st.write(f"Referanser: {', '.join([source for source in sources])}.")
 
     if user_input := st.chat_input("Type something..."):
         with st.chat_message("user", avatar="🙋🏼‍♂️"):
@@ -73,6 +73,7 @@ if __name__ == "__main__":
             def get_answer_from_stream(
                 stream: Iterator[dict[str, str]]
             ) -> Generator[str, None, None]:
+                """Iterate through the stream and yield the answer."""
                 for item in stream:
                     yield item["answer"]
 
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
             # Print the sources
             sources = set(chunk.metadata["source"] for chunk in data["context"])
-            st.write(f"Referanser: {", ".join([source for source in sources])}.")
+            st.write(f"Referanser: {', '.join([source for source in sources])}.")
 
             # Add items to the history
             st.session_state.chat_history.add_user_message(data["question"])

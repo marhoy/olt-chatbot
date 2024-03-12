@@ -1,59 +1,69 @@
 """Code for the chatbot model."""
 
+import pickle
 from operator import itemgetter
-from typing import Any
+from typing import Any, Iterator
 
-from bs4 import BeautifulSoup
-from langchain.chains import RetrievalQAWithSourcesChain
-from langchain.chains.base import Chain
 from langchain.retrievers import EnsembleRetriever
 from langchain.retrievers.bm25 import BM25Retriever
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores.chroma import Chroma
-from langchain_community.document_loaders.recursive_url_loader import RecursiveUrlLoader
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from loguru import logger
 
+from olt_chatbot import config
 from olt_chatbot.llm_models import EMBEDDING_MODELS, LLM_GENERATORS
 
-url = "https://olympiatoppen.no/"
+EMBEDDING = EMBEDDING_MODELS["text-embedding-ada-002"]
 
 
-def get_docs_from_url(url: str, max_depth: int = 1) -> list[Document]:
-    """Get documents from a URL."""
-    logger.info(f"Loading documents from {url}")
-    loader = RecursiveUrlLoader(
-        url=url,
-        max_depth=max_depth,
-        extractor=lambda x: BeautifulSoup(x, "html.parser").text,
-        prevent_outside=True,
+def write_docstores_to_disk(docs: Iterator[Document]) -> None:
+    """Store a vector db and BM25 retriever to disk."""
+    text_splitter = text_splitter = RecursiveCharacterTextSplitter(
+        # Set a really small chunk size, just to show.
+        chunk_size=500,
+        chunk_overlap=50,
+        length_function=len,
+        is_separator_regex=False,
     )
-    data = loader.load()
-    return data
 
-
-def create_retriever(docs: list[Document]) -> BaseRetriever:
-    """Create a retriever from documents."""
-    text_splitter = CharacterTextSplitter(
-        separator="\n", chunk_size=1000, chunk_overlap=300
-    )
+    # We can not add documents to the BM25 retriever, so we need to have all chunks
+    # available as a list. Let's hope you have enough memory...
     chunks = text_splitter.split_documents(docs)
 
     logger.info("Creating vector retriever")
-    embedding = EMBEDDING_MODELS["text-embedding-ada-002"]
-    vector_store = Chroma.from_documents(filter_complex_metadata(chunks), embedding)
-    vector_retriever = vector_store.as_retriever(
-        search_type="mmr", search_kwargs={"k": 5}
+    vector_store = Chroma.from_documents(
+        filter_complex_metadata(chunks),
+        embedding=EMBEDDING,
+        persist_directory=config.CHROMA_DB_PATH,
     )
+    vector_store.persist()
 
     logger.info("Creating BM25 retriever")
     bm25_retriever = BM25Retriever.from_documents(chunks)
-    bm25_retriever.k = 5
+    with open(config.BM25_RETRIEVER_PATH, "wb") as file:
+        pickle.dump(bm25_retriever, file)
+
+
+def load_retriever_from_disk(k: int = 5) -> BaseRetriever:
+    """Load a retriever from disk."""
+    # Load Chroma db from disk
+    logger.debug("Loading retriever from disk")
+    vectordb = Chroma(
+        persist_directory=config.CHROMA_DB_PATH, embedding_function=EMBEDDING
+    )
+    vector_retriever = vectordb.as_retriever(search_type="mmr", search_kwargs={"k": k})
+
+    # Load BM25 retriever from disk
+    with open(config.BM25_RETRIEVER_PATH, "rb") as file:
+        bm25_retriever = pickle.load(file)
+    bm25_retriever.k = k
+
     ensemble_retriever = EnsembleRetriever(
         retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
     )
@@ -61,32 +71,10 @@ def create_retriever(docs: list[Document]) -> BaseRetriever:
     return ensemble_retriever
 
 
-def get_llm_chain(
-    llm_name: str,
-    url: str,
-    max_depth: int = 3,
-) -> Chain:
-    """Create a chain with a retriever from a URL."""
-    docs = get_docs_from_url(url, max_depth)
-    retriever = create_retriever(docs)
-    llm = LLM_GENERATORS[llm_name]
-    chain = RetrievalQAWithSourcesChain.from_llm(
-        llm=llm,
-        retriever=retriever,  # return_source_documents=True
-    )
-    logger.info("Chain created")
-    return chain
-
-
-docs = get_docs_from_url("https://olympiatoppen.no/", max_depth=1)
-retriever = create_retriever(docs)
-
-
 def get_chat_model(
     model_name: str = "gpt-3.5",
 ) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Create a chat model with history."""
-
     logger.debug(f"Creating chat model with {model_name}")
 
     def format_docs(docs: list[Document]) -> str:
@@ -94,6 +82,7 @@ def get_chat_model(
 
     llm = LLM_GENERATORS[model_name]
 
+    retriever = load_retriever_from_disk()
     prompt = ChatPromptTemplate.from_messages(
         [
             (
