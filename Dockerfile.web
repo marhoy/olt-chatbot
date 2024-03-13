@@ -56,8 +56,6 @@ RUN poetry install --only-root
 ENV OUTPUT_DIRECTORY=/mnt/input
 ENV INPUT_DIRECTORY=/mnt/input
 
-# Streamlit theme
-ENV STREAMLIT_THEME_BASE=light
-
 # Run this command
-CMD ["authbind", "streamlit", "run", "--server.port", "80", "src/olt_chatbot/streamlit_chat.py"]
+WORKDIR /home/$USERNAME/app/src/olt_chatbot/webapp
+CMD ["authbind", "streamlit", "run", "--server.port", "80", "streamlit_chat.py"]
