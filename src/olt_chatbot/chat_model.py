@@ -22,11 +22,11 @@ from olt_chatbot.llm_models import EMBEDDING_MODELS, LLM_GENERATORS
 EMBEDDING = EMBEDDING_MODELS["text-embedding-ada-002"]
 
 
-def write_docstores_to_disk(docs: Iterator[Document]) -> None:
+def write_docstores_to_disk(docs: list[Iterator[Document]]) -> None:
     """Store a vector db and BM25 retriever to disk."""
     text_splitter = text_splitter = RecursiveCharacterTextSplitter(
         # Set a really small chunk size, just to show.
-        chunk_size=500,
+        chunk_size=200,
         chunk_overlap=50,
         length_function=len,
         is_separator_regex=False,
@@ -34,7 +34,9 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
 
     # We can not add documents to the BM25 retriever, so we need to have all chunks
     # available as a list. Let's hope you have enough memory...
-    chunks = text_splitter.split_documents(docs)
+    chunks =[]
+    for doc in docs:
+        chunks += text_splitter.split_documents(docs)
 
     logger.info("Creating vector retriever")
     vector_store = Chroma.from_documents(
@@ -70,8 +72,7 @@ def load_retriever_from_disk(k: int = 5) -> BaseRetriever:
 
     return ensemble_retriever
 
-
-def get_chat_model(
+def get_chat_model (
     model_name: str = "gpt-3.5",
 ) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Create a chat model with history."""
@@ -107,7 +108,6 @@ def get_chat_model(
             ),
         ]
     )
-
     rag_chain_from_docs = (
         RunnablePassthrough.assign(
             context=itemgetter("context") | RunnableLambda(format_docs)

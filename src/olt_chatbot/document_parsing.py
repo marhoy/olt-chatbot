@@ -7,14 +7,12 @@ from langchain_community.document_loaders.recursive_url_loader import RecursiveU
 from langchain_core.documents import Document
 from loguru import logger
 
-url = "https://olympiatoppen.no/"
-
-
-def get_docs_from_url(url: str, max_depth: int = 1) -> Iterator[Document]:
+def get_docs_from_url(url: str, max_depth: int = 1000) -> Iterator[Document]:
     """Get documents from a URL."""
     logger.info(f"Loading documents from {url}")
     loader = RecursiveUrlLoader(
         url=url,
+        #exclude_dirs= ['https://olympiatoppen.no/nyheter/'],
         max_depth=max_depth,
         extractor=text_extractor,
         metadata_extractor=metadata_extractor,

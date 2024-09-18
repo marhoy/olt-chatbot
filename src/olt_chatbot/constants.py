@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # Credentials for Azure OpenAI API
     AZURE_OPENAI_ENDPOINT: str = ""
-    AZURE_OPENAI_API_KEY: SecretStr = cast(SecretStr, "")
+    OPENAI_API_KEY: SecretStr = cast(SecretStr, "")
     AZURE_OPENAI_API_VERSION: str = "2023-09-01-preview"
 
     OUTPUT_DIRECTORY: Path = Path(__file__).parents[2].absolute() / "output"
