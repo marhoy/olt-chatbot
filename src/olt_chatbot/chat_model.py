@@ -118,8 +118,8 @@ def get_chat_model (
                 "human",
                 (
                     "You are an assistant for question-answering tasks. "
-                    "Use the following pieces of retrieved context to answer the "
-                    "question.If you don't know the answer, just say that you "
+                    "Give a user question and some context, answer the question."
+                    "If you don't know the answer, just say that you "
                     "don't know.\n\n"
                     "Context: {context}\n\n"
                 ),
