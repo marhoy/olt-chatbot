@@ -49,3 +49,25 @@ def metadata_extractor(raw_html: str, url: str) -> dict[str, str]:
     metadata = {"source": url}
     # TODO: Also extract title and description, depending on file type.
     return metadata
+
+
+def read_pdfs_from_fagstoff_folder(folder_path='/Users/ingrideythorsdottir/Projects/olt-chatbot/src/olt_chatbot/fagstoff'):
+    #pdf_texts = []
+    pdf_sources = []
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.pdf'):
+            file_path = os.path.join(folder_path, file_name)
+            pdf_text = read_pdf(file_path)
+            pdf_sources.append((pdf_text, file_name))
+    logger.info(f"pdf_sources: {pdf_sources}")  
+    #return pdf_texts
+    return pdf_sources
+
+def read_pdf(file_path):
+    with open(file_path, 'rb') as pdf_file:
+        reader = PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
+    
