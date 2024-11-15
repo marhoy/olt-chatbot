@@ -19,7 +19,7 @@ if __name__ == "__main__":
     urls = ["https://olympiatoppen.no/", "https://olt-skala.nif.no/"]
     url_docs =[] # Collect website documents here
     for url in urls:
-        url_docs.extend(list(get_docs_from_url(url, max_depth=50)))
+        url_docs.extend(list(get_docs_from_url(url, max_depth=100)))
 
 
     # Process PDF documents
