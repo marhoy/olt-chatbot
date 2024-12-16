@@ -5,6 +5,7 @@ supported by LangChain yet, we're using Pydantic 1 for data classes.
 """
 
 import os
+from pathlib import Path
 from typing import cast
 
 from dotenv import find_dotenv
@@ -24,6 +25,18 @@ class Settings(BaseSettings):
     AZURE_OPENAI_ENDPOINT: str = ""
     AZURE_OPENAI_API_KEY: SecretStr = cast(SecretStr, "")
     AZURE_OPENAI_API_VERSION: str = "2023-09-01-preview"
+
+    OUTPUT_DIRECTORY: Path = Path(__file__).parents[2].absolute() / "output"
+
+    # Chroma DB
+    @property
+    def CHROMA_DB_PATH(self) -> str:
+        return str(self.OUTPUT_DIRECTORY / "chroma-db")
+
+    # BM25 Retriever
+    @property
+    def BM25_RETRIEVER_PATH(self) -> str:
+        return str(self.OUTPUT_DIRECTORY / "bm25-retriever.pkl")
 
     class Config:
         """Class configuration."""

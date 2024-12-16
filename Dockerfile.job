@@ -1,0 +1,66 @@
+FROM python:3.11-slim-bookworm
+
+# These directories will be mounted by AppCity
+VOLUME /mnt/input
+VOLUME /mnt/output
+
+# Define some environment variables
+ENV PIP_NO_CACHE_DIR=true \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies needed to download/install packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    apt-utils \
+    curl
+
+# We want to run things as a non-privileged user
+ENV USERNAME=user
+ENV PATH="$PATH:/home/$USERNAME/.local/bin:/home/$USERNAME/app/.venv/bin"
+
+# Add user and set up a workdir
+RUN useradd -m $USERNAME -u 12345
+WORKDIR /home/$USERNAME/app
+RUN chown $USERNAME.$USERNAME .
+
+# Everything below here runs as a non-privileged user
+USER $USERNAME
+
+# Install poetry
+RUN curl -sSL https://install.python-poetry.org | python - --version 1.8.0
+RUN poetry config virtualenvs.in-project true
+
+# Install runtime dependencies (will be cached)
+COPY pyproject.toml poetry.lock ./
+RUN poetry install --without dev --no-root
+
+
+#
+# Application specific configuration below here
+#
+
+# Define docker build arguments, and environment variables that gets populated from the
+# build arguments
+ARG GIT_BRANCH
+ARG GIT_COMMIT
+ENV GIT_BRANCH=${GIT_BRANCH} \
+    GIT_COMMIT=${GIT_COMMIT}
+
+# Copy project files to container
+COPY . .
+
+# Install our own package
+RUN poetry install --only-root
+
+# Environment variables that are Docker-specific
+ENV OUTPUT_DIRECTORY=/mnt/output
+
+# NOTE:
+# - We want the python-process to be PID 1 inside the container, because this allows us
+#   to catch signals sent to the container (by e.g. docker stop). In order to achieve
+#   that, we _must_ use the exec form of the ENTRYPOINT (list of strings).
+# - By specifying the task module/name in the CMD field (which will be used as arguments
+#   for the ENTRYPOINT), we can easily choose to run a different task in the same
+#   container, by instead saying: "docker run image mymltemplate.tasks TaskName"
+ENTRYPOINT [ "poetry", "run" ]
+CMD [ "python", "-m", "olt_chatbot.tasks" ]

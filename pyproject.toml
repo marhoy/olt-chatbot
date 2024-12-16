@@ -6,17 +6,17 @@ authors = ["Martin Høy <martin.hoy@dnv.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.10,<3.12"
+loguru = "^0.7.2"
 python-dotenv = "^1.0.1"
 pydantic = "^2.6.3"
 langchain = "^0.1.11"
 langchain-openai = "^0.0.8"
 streamlit = "^1.31.1"
-loguru = "^0.7.2"
 beautifulsoup4 = "^4.12.3"
 chromadb = "^0.4.24"
 rank-bm25 = "^0.2.2"
-langchainhub = "^0.1.15"
+pymupdf = "^1.23.26"
 
 
 [tool.poetry.group.dev.dependencies]
