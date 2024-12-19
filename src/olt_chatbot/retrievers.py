@@ -4,7 +4,7 @@ import itertools
 import pickle
 from collections.abc import Iterator
 
-from langchain.retrievers.ensemble import EnsembleRetriever
+# from langchain.retrievers.ensemble import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores.utils import filter_complex_metadata
@@ -83,12 +83,12 @@ def load_retriever_from_disk(k: int = 15) -> BaseRetriever:
     vector_retriever = vectordb.as_retriever(search_kwargs={"k": k})
 
     # Load BM25 retriever from disk
-    with config.BM25_RETRIEVER_PATH.open("rb") as file:
-        bm25_retriever = pickle.load(file)  # noqa: S301
-        bm25_retriever.k = k
+    # with config.BM25_RETRIEVER_PATH.open("rb") as file:
+    #     bm25_retriever = pickle.load(file)
+    #     bm25_retriever.k = k
 
-    ensemble_retriever = EnsembleRetriever(  # noqa: F841
-        retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
-    )
+    # ensemble_retriever = EnsembleRetriever(
+    #     retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
+    # )
 
-    return vector_retriever
+    return vector_retriever  # noqa: RET504
