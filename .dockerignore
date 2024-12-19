@@ -4,10 +4,13 @@
 # Include only these files / directories
 !README.md
 !pyproject.toml
-!poetry.lock
+!uv.lock
 !Dockerfile.*
 !src/
-
+!fagstoff/
+!public/
+!chainlit.md
+!.chainlit/config.toml
 
 # Exclude any __pycache__ directories
 **/__pycache__/

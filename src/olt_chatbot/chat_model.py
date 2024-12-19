@@ -1,94 +1,62 @@
-"""Code for the chatbot model."""
+"""Code for the LangChain Question-Answer chain."""
 
-import pickle
 from operator import itemgetter
-from typing import Any, Iterator
+from typing import Any
 
-from langchain.retrievers import EnsembleRetriever
-from langchain.retrievers.bm25 import BM25Retriever
-from langchain.vectorstores.chroma import Chroma
-from langchain_community.vectorstores.utils import filter_complex_metadata
+from langchain.output_parsers.openai_tools import JsonOutputKeyToolsParser
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.retrievers import BaseRetriever
-from langchain_core.runnables import Runnable, RunnableLambda, RunnablePassthrough
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.runnables import (
+    Runnable,
+    RunnableLambda,
+    RunnableParallel,
+    RunnablePassthrough,
+)
 from loguru import logger
+from pydantic import BaseModel, Field
 
-from olt_chatbot import config
-from olt_chatbot.llm_models import EMBEDDING_MODELS, LLM_GENERATORS
-
-EMBEDDING = EMBEDDING_MODELS["text-embedding-ada-002"]
+from olt_chatbot.llm_models import LLM_GENERATORS
+from olt_chatbot.retrievers import load_retriever_from_disk
 
 
-def write_docstores_to_disk(docs: Iterator[Document]) -> None:
-    """Store a vector db and BM25 retriever to disk."""
-    text_splitter = text_splitter = RecursiveCharacterTextSplitter(
-        # Set a really small chunk size, just to show.
-        chunk_size=500,
-        chunk_overlap=50,
-        length_function=len,
-        is_separator_regex=False,
+# This is the response object from the model. It Forces the model to cite the sources
+# used.
+class CitedAnswer(BaseModel):
+    """Answer the user question based only on the given sources, and cite the sources used."""  # noqa: E501
+
+    answer: str = Field(
+        ...,
+        description=(
+            "The answer to the user question, which is based only on the given sources."
+        ),
+    )
+    citations: list[str] = Field(
+        ...,
+        description="The reference of the SPECIFIC source IDs which justify the answer.",  # noqa: E501
     )
 
-    # We can not add documents to the BM25 retriever, so we need to have all chunks
-    # available as a list. Let's hope you have enough memory...
-    chunks = text_splitter.split_documents(docs)
 
-    logger.info("Creating vector retriever")
-    vector_store = Chroma.from_documents(
-        filter_complex_metadata(chunks),
-        embedding=EMBEDDING,
-        persist_directory=config.CHROMA_DB_PATH,
-    )
-    vector_store.persist()
-
-    logger.info("Creating BM25 retriever")
-    bm25_retriever = BM25Retriever.from_documents(chunks)
-    with open(config.BM25_RETRIEVER_PATH, "wb") as file:
-        pickle.dump(bm25_retriever, file)
-
-
-def load_retriever_from_disk(k: int = 5) -> BaseRetriever:
-    """Load a retriever from disk."""
-    # Load Chroma db from disk
-    logger.debug("Loading retriever from disk")
-    vectordb = Chroma(
-        persist_directory=config.CHROMA_DB_PATH, embedding_function=EMBEDDING
-    )
-    vector_retriever = vectordb.as_retriever(search_type="mmr", search_kwargs={"k": k})
-
-    # Load BM25 retriever from disk
-    with open(config.BM25_RETRIEVER_PATH, "rb") as file:
-        bm25_retriever = pickle.load(file)
-    bm25_retriever.k = k
-
-    ensemble_retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
-    )
-
-    return ensemble_retriever
-
-
-def get_chat_model(
-    model_name: str = "gpt-3.5",
+def get_chain_with_history(
+    model_name: str = "gpt-4o",
 ) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Create a chat model with history."""
     logger.debug(f"Creating chat model with {model_name}")
 
     def format_docs(docs: list[Document]) -> str:
-        return "\n\n".join(doc.page_content for doc in docs)
+        return "\n\n".join(
+            f"Reference: {doc.metadata['source']}\nContent: {doc.page_content}"
+            for doc in docs
+        )
 
     llm = LLM_GENERATORS[model_name]
-
     retriever = load_retriever_from_disk()
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
                 (
-                    "You are a helpful assistant working at Olympiatoppen. "
+                    "You are a helpful AI assistant working at Olympiatoppen. "
                     "You answer questions in Norwegian. "
                 ),
             ),
@@ -97,14 +65,13 @@ def get_chat_model(
                 "human",
                 (
                     "You are an assistant for question-answering tasks. "
-                    "Use the following pieces of retrieved context to answer the "
-                    "question. If you don't know the answer, just say that you "
+                    "Given a user question and some context, answer the question."
+                    "If you don't know the answer, just say that you "
                     "don't know.\n\n"
-                    "Question: {question}\n\n"
                     "Context: {context}\n\n"
-                    "Answer:"
                 ),
             ),
+            ("human", "{question}"),
         ]
     )
 
@@ -113,11 +80,60 @@ def get_chat_model(
             context=itemgetter("context") | RunnableLambda(format_docs)
         )
         | prompt
-        | llm
-        | StrOutputParser()
+        | llm.with_structured_output(CitedAnswer)
     )
-    chain = RunnablePassthrough.assign(
+    return RunnablePassthrough.assign(
         context=itemgetter("question") | retriever
-    ).assign(answer=rag_chain_from_docs)
+    ).assign(cited_answer=rag_chain_from_docs)
 
-    return chain
+
+def format_docs_with_id(docs: list[Document]) -> str:
+    """Format the retrieved documents with an enumerated ID."""
+    formatted = [
+        (f"Source ID: {i}\nArticle Snippet: {doc.page_content}")
+        for i, doc in enumerate(docs)
+    ]
+    return "\n\n".join(formatted)
+
+
+def get_cited_rag_chain_for_streaming(
+    llm_name: str = "gpt-4o-mini",
+) -> Runnable[str, dict[str, Any]]:
+    """Get the QA chain for Cited Answers."""
+    llm = LLM_GENERATORS[llm_name]
+    llm_with_tool = llm.bind_tools(
+        [CitedAnswer],
+        tool_choice="CitedAnswer",
+    )
+
+    retriever = load_retriever_from_disk(k=20)
+
+    output_parser = JsonOutputKeyToolsParser(
+        key_name="CitedAnswer", first_tool_only=True
+    )
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                (
+                    "You're a helpful AI assistant, working at Olympiatoppen (OLT). "
+                    "You answer questions in Norwegian. "
+                    "Given a user question and some article snippets, answer the "
+                    "question. If none of the articles answer the question, just "
+                    "say you don't know.\n\n"
+                    "Here are the articles:\n\n{context}"
+                ),
+            ),
+            ("human", "{question}"),
+        ]
+    )
+
+    formatted_docs = itemgetter("docs") | RunnableLambda(format_docs_with_id)
+    answer_chain = prompt | llm_with_tool | output_parser
+    return (
+        RunnableParallel(question=RunnablePassthrough(), docs=retriever)
+        .assign(context=formatted_docs)
+        .assign(cited_answer=answer_chain)
+        .pick(["cited_answer", "docs"])
+    )

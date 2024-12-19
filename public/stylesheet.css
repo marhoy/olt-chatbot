@@ -1,0 +1,108 @@
+/* Hide the sidebar with persistent chats */
+/*
+#root > div > div > div > div.MuiBox-root.css-kjafn5 {
+  display: none;
+}
+*/
+
+/* Target the watermark container and hide it */
+.MuiStack-root.watermark {
+  display: none !important;  /* Completely hide the watermark */
+}
+
+.MuiBox-root#header {
+  display: flex;                      /* Use flexbox for layout */
+  justify-content: space-between;     /* Space out elements (left and right) */
+  align-items: center;                /* Vertically align items */
+  padding: 0 20px;                    /* Add padding for spacing */
+  box-sizing: border-box;             /* Include padding in the total width */
+  width: 100%;                        /* Ensure the header spans the full width */
+  overflow: hidden;                   /* Prevent content overflow */
+}
+
+/* Ensure the logo size fits well within the header */
+.MuiBox-root#header img[alt="logo"] {
+  max-width: 150px !important;       /* Set a maximum width for the logo */
+  max-height: 100px !important;      /* Set a maximum height */
+  width: auto !important;            /* Maintain aspect ratio */
+  height: auto !important;           /* Keep height flexible */
+  object-fit: contain !important;    /* Ensure the logo fits without distortion */
+  margin-left: auto;                 /* Push the logo to the right */
+  display: block;
+  margin-top: 50px;
+}
+
+/* For larger screens, the logo stays at 150px */
+@media (min-width: 768px) {
+  .MuiBox-root#header img[alt="logo"] {
+      max-width: 150px !important; 
+      max-height: 100px !important;
+  }
+}
+
+/* For smaller screens, reduce the logo size to fit */
+@media (max-width: 767px) {
+  .MuiBox-root#header img[alt="logo"] {
+      max-width: 100px !important;   /* Scale down for smaller screens */
+      max-height: 75px !important;
+  }
+}
+
+.MuiBox-root#header {
+  min-height: 60px;                  /* Ensure the header has enough height */
+  width: 100%;                       /* Make sure it spans the full width */
+  overflow: visible;                 /* Ensure no content is hidden */
+}
+
+/* Ensure the container does not limit the size of the image */
+.MuiStack-root.css-mlggcq {
+  width: auto !important;            /* Allow the container to grow */
+  height: auto !important;           /* Allow the container to grow */
+  max-width: none !important;        /* Remove any maximum width restriction */
+  max-height: none !important;       /* Remove any maximum height restriction */
+  display: flex;                     /* Flexbox to align the content */
+  align-items: center;               /* Center content vertically */
+  justify-content: center;           /* Center content horizontally */
+  overflow: visible !important;      /* Ensure no content is hidden */
+}
+
+/* Adjust the avatar container */
+.MuiAvatar-root.MuiAvatar-circular.css-m2icte {
+  width: auto !important;            /* Allow the avatar container to grow */
+  height: auto !important;           /* Allow the avatar container to grow */
+  max-width: none !important;        /* Remove max-width */
+  max-height: none !important;       /* Remove max-height */
+}
+
+/* Ensure the image displays at its intrinsic size */
+.MuiAvatar-img.css-1hy9t21 {
+  width: 100px !important;           /* Set to intrinsic width */
+  height: auto !important;          /* Set to intrinsic height */
+  object-fit: contain !important;    /* Prevent distortion */
+  max-width: 100%;                  /* Prevent it from overflowing the container */
+}
+
+
+/* Specific styles for the SPURT avatar container */
+.MuiAvatar-root.MuiAvatar-circular.css-v72an7 {
+  width: 50px !important;
+  height: 55px !important;  
+  max-width: none;
+  max-height: none;
+}
+
+/* Specific styles for the SPURT avatar image */
+.MuiAvatar-root.MuiAvatar-circular.css-v72an7 .MuiAvatar-img.css-1hy9t21 {
+  width: 400px !important;           /* Set a smaller width for SPURT */
+  height: auto !important;          /* Maintain aspect ratio */
+  object-fit: contain;              /* Ensure the image scales without distortion */
+  max-width: 100%;                  /* Prevent it from overflowing its container */
+}
+
+/* Optional: Use aria-label to target the SPURT avatar */
+.MuiAvatar-root[aria-label="TOPPEN"] .MuiAvatar-img {
+  width: 400px !important;           /* Adjust to your desired size */
+  height: auto !important;
+}
+
+

@@ -1,4 +1,6 @@
-.python-version
 **/__pycache__
 *.env
 output*
+
+# Ignore notebooks in the root directory
+/*.ipynb

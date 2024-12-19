@@ -1,45 +1,41 @@
 """Define the LLM models used by the date_autoreply bot."""
 
+import os
+
 from langchain_core.embeddings import Embeddings
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.language_models.llms import BaseLLM
-from langchain_openai import AzureChatOpenAI, AzureOpenAI, AzureOpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 from olt_chatbot import config
 
+# Set common environment variables for the Azure OpenAI API
+os.environ["OPENAI_API_KEY"] = config.OPENAI_API_KEY.get_secret_value()
+
 EMBEDDING_MODELS: dict[str, Embeddings] = {
-    "text-embedding-ada-002": AzureOpenAIEmbeddings(
-        azure_deployment="text-embedding-ada-002",
-        azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
-        api_key=config.AZURE_OPENAI_API_KEY,
-        api_version=config.AZURE_OPENAI_API_VERSION,
-    )
+    "text-embedding-ada-002": OpenAIEmbeddings(
+        model="text-embedding-ada-002",
+    ),
+    "text-embedding-3-large": OpenAIEmbeddings(
+        model="text-embedding-3-large",
+    ),
 }
 
-
-LLM_GENERATORS: dict[str, BaseLLM | BaseChatModel] = {
-    "gpt-3.5-turbo-instruct": AzureOpenAI(
-        azure_deployment="gpt-35-turbo-instruct-0914",
-        azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
-        api_key=config.AZURE_OPENAI_API_KEY,
-        api_version=config.AZURE_OPENAI_API_VERSION,
-        max_tokens=512,
-        temperature=0.0,
-    ),
-    "gpt-3.5": AzureChatOpenAI(
-        azure_deployment="gpt-35-turbo-1106",
-        azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
-        api_key=config.AZURE_OPENAI_API_KEY,
-        api_version=config.AZURE_OPENAI_API_VERSION,
+LLM_GENERATORS: dict[str, ChatOpenAI] = {
+    "gpt-3.5": ChatOpenAI(
+        model="gpt-3.5-turbo-1106",
         max_tokens=2048,
         temperature=0.0,
+        seed=0,
     ),
-    "gpt-4": AzureChatOpenAI(
-        azure_deployment="gpt-4-turbo-128k-1106",
-        azure_endpoint=config.AZURE_OPENAI_ENDPOINT,
-        api_key=config.AZURE_OPENAI_API_KEY,
-        api_version=config.AZURE_OPENAI_API_VERSION,
+    "gpt-4o-mini": ChatOpenAI(
+        model="gpt-4o-mini",
         max_tokens=2048,
         temperature=0.0,
+        seed=0,
+    ),
+    "gpt-4o": ChatOpenAI(
+        model="gpt-4o",
+        max_tokens=2048,
+        temperature=0.0,
+        seed=0,
     ),
 }
