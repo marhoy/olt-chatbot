@@ -5,11 +5,12 @@ VOLUME /mnt/input
 VOLUME /mnt/output
 
 # Define some environment variables
-ENV PIP_NO_CACHE_DIR=true \
+ENV UV_NO_CACHE=true \
+    UV_NO_SYNC=true \
     DEBIAN_FRONTEND=noninteractive
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:0.5.8 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.5.10 /uv /uvx /bin/
 
 # We want to run things as a non-privileged user
 ENV USERNAME=user
@@ -24,8 +25,8 @@ RUN chown $USERNAME.$USERNAME .
 USER $USERNAME
 
 # Install runtime dependencies (will be cached)
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+COPY --chown=${USERNAME}:${USERNAME} pyproject.toml uv.lock ./
+RUN uv sync --no-dev --no-install-project
 
 
 #
@@ -40,20 +41,14 @@ ENV GIT_BRANCH=${GIT_BRANCH} \
     GIT_COMMIT=${GIT_COMMIT}
 
 # Copy project files to container
-COPY . .
+COPY --chown=${USERNAME}:${USERNAME} . .
 
 # Install our own package
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 # Environment variables that are Docker-specific
 ENV OUTPUT_DIRECTORY=/mnt/output
 
-# NOTE:
-# - We want the python-process to be PID 1 inside the container, because this allows us
-#   to catch signals sent to the container (by e.g. docker stop). In order to achieve
-#   that, we _must_ use the exec form of the ENTRYPOINT (list of strings).
-# - By specifying the task module/name in the CMD field (which will be used as arguments
-#   for the ENTRYPOINT), we can easily choose to run a different task in the same
-#   container, by instead saying: "docker run image mymltemplate.tasks TaskName"
+# Run this command
 ENTRYPOINT [ "uv", "run" ]
 CMD [ "update-retrievers" ]
