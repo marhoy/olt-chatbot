@@ -18,6 +18,7 @@ dependencies = [
     "langchain-community >= 0.3.7",
     "langchain-openai >= 0.2.8",
     "langchain-chroma >= 0.1.4",
+    "onnxruntime==1.19.2",          # onnxruntime 1.20.x doesn't exist for MacOS < 13
     "beautifulsoup4 >= 4.12.3",
     "rank-bm25 >= 0.2.2",
     "chainlit >= 1.3.2",
