@@ -1,12 +1,11 @@
 """Code for the document retriever."""
 
 import itertools
-import pickle
+import uuid
 from collections.abc import Iterator
 
-from langchain.retrievers.ensemble import EnsembleRetriever
+# from langchain.retrievers.ensemble import EnsembleRetriever
 from langchain_chroma import Chroma
-from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores.utils import filter_complex_metadata
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
@@ -28,15 +27,15 @@ def update_retriever_databases() -> None:
     all_docs = itertools.chain(
         get_docs_from_url("https://olympiatoppen.no/", max_depth=100),
         get_docs_from_url("https://olt-skala.nif.no/", max_depth=100),
-        get_docs_from_url("https://www.summit2028.no/", max_depth=100),
-        get_docs_from_url("https://www.teamnor.no/", max_depth=100),
+        # get_docs_from_url("https://www.summit2028.no/", max_depth=100),
+        # get_docs_from_url("https://www.teamnor.no/", max_depth=100),
         read_pdfs_from_fagstoff_folder(),
     )
-    write_docstores_to_disk(all_docs)
+    populate_and_write_retriever_to_disk(all_docs)
 
 
-def write_docstores_to_disk(docs: Iterator[Document]) -> None:
-    """Store a vector db and BM25 retriever to disk."""
+def populate_and_write_retriever_to_disk(docs: Iterator[Document]) -> None:
+    """Store a vector db to disk."""
     text_splitter = RecursiveCharacterTextSplitter(
         # Set a really small chunk size, just to show.
         chunk_size=500,
@@ -44,9 +43,6 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
         length_function=len,
         is_separator_regex=False,
     )
-
-    # Make two independent interators, so we can feed one to each of the indexers.
-    docs1, docs2 = itertools.tee(docs, 2)
 
     # We need to add the documents to the Chroma db in chunks. First create an empty
     # database collection:
@@ -57,20 +53,17 @@ def write_docstores_to_disk(docs: Iterator[Document]) -> None:
 
     # Then loop over the documents in batches, create chunks, and add each chunk to the
     # database. The maximum number of chunks is 5461.
-    for i, doc_chunk in enumerate(itertools.batched(docs1, 25), start=1):
-        chunks = filter_complex_metadata(text_splitter.split_documents(doc_chunk))
+    for i, doc_batch in enumerate(itertools.batched(docs, 25), start=1):
+        chunks = filter_complex_metadata(text_splitter.split_documents(doc_batch))
         for chunk_batch in itertools.batched(chunks, 5000):
+            # Add a unique identifier to each chunk
+            for chunk in chunk_batch:
+                chunk.metadata["chunk_id"] = str(uuid.uuid4())
             logger.info(
                 f"Chroma: Processing {len(chunk_batch)} chunks from batch {i} with "
-                f"{len(doc_chunk)} documents and {len(chunks)} chunks."
+                f"{len(doc_batch)} documents and {len(chunks)} chunks."
             )
             vector_store.add_documents(list(chunk_batch))
-
-    # Finally, feed the second iterator to BM25 in one go.
-    logger.info("Creating BM25 retriever")
-    bm25_retriever = BM25Retriever.from_documents(text_splitter.split_documents(docs2))
-    with config.BM25_RETRIEVER_PATH.open("wb") as file:
-        pickle.dump(bm25_retriever, file)
 
 
 def load_retriever_from_disk(k: int = 15) -> BaseRetriever:
@@ -80,15 +73,4 @@ def load_retriever_from_disk(k: int = 15) -> BaseRetriever:
     vectordb = Chroma(
         persist_directory=config.CHROMA_DB_PATH, embedding_function=EMBEDDING
     )
-    vector_retriever = vectordb.as_retriever(search_kwargs={"k": k})
-
-    # Load BM25 retriever from disk
-    with config.BM25_RETRIEVER_PATH.open("rb") as file:
-        bm25_retriever = pickle.load(file)  # noqa: S301
-        bm25_retriever.k = k
-
-    ensemble_retriever = EnsembleRetriever(  # noqa: F841
-        retrievers=[bm25_retriever, vector_retriever], weights=[0.4, 0.6]
-    )
-
-    return vector_retriever
+    return vectordb.as_retriever(search_kwargs={"k": k})

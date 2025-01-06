@@ -19,6 +19,7 @@ async def on_chat_start() -> None:
     chain = get_cited_rag_chain_for_streaming()
     cl.user_session.set("chain", chain)
     cl.user_session.set("chat_history", ChatMessageHistory())
+    cl.user_session.set("chunks", [])
 
 
 @cl.set_starters
@@ -58,13 +59,18 @@ async def set_starters(_user: User | None = None) -> list[cl.Starter]:
 @cl.on_message
 async def on_message(message: cl.Message) -> None:
     """Handle the user input and generate a response."""
-    # #Your custom logic goes here...
-    chain: Runnable[str, dict[str, Any]] = cl.user_session.get("chain")
+    # Get objects from the user session
+    chain: Runnable[dict[str, Any], dict[str, Any]] = cl.user_session.get("chain")
     chat_history: ChatMessageHistory = cl.user_session.get("chat_history")
+    old_chunks = cl.user_session.get("chunks")
 
     # Create an async stream from the runnable
     async_stream = chain.astream(
-        message.content,
+        {
+            "question": message.content,
+            "chat_history": chat_history.messages,
+            "old_docs": old_chunks,
+        },
         config=RunnableConfig(callbacks=[cl.LangchainCallbackHandler()]),
     )
 
@@ -80,34 +86,28 @@ async def on_message(message: cl.Message) -> None:
             msg.content = chunk["cited_answer"].get("answer", "")
             await msg.update()
 
-    # Get the final answer, will be added to the history
-    ai_answer = chunk["cited_answer"].get("answer", "")
-
-    # Extract the citations and create elements for the message
-    cited_doc_indices: list[str] = chunk["cited_answer"].get("citations", [])
+    # Extract the cited uuids
+    chunk_uuids: list[str] = chunk["cited_answer"].get("citations", [])
 
     # Debug info
-    logger.debug(f"The retriver found {len(retrieved_docs)} chunks")
-    logger.debug(f"The following chunks are cited: {cited_doc_indices}")
+    logger.debug(f"The context was based on {len(retrieved_docs)} chunks.")
+    logger.debug(f"The following chunks are cited: {chunk_uuids}")
 
     # There could potentially be multiple chunks retrieved from the same document.
     # Create a dict of unique document metadata, where the key is the source field.
-    cited_metadata = {}
-    for i_str in cited_doc_indices:
-        try:
-            i = int(i_str)
-        except ValueError:
-            continue
-        if not 0 <= i <= len(retrieved_docs):
-            continue
-        metadata = retrieved_docs[i].metadata
-        if metadata["source"] not in cited_metadata:
-            cited_metadata[metadata["source"]] = metadata
+    cited_documents: dict[str, dict[str, Any]] = {}
+    for uuid in chunk_uuids:
+        for doc in retrieved_docs:
+            if (
+                doc.metadata.get("chunk_id") == uuid
+                and doc.metadata.get("source") not in cited_documents
+            ):
+                cited_documents[doc.metadata["source"]] = doc.metadata
 
     # Add the citations to the message
-    if cited_metadata:
+    if cited_documents:
         msg.content += "\n\nKilder:\n\n"
-        for metadata in cited_metadata.values():
+        for metadata in cited_documents.values():
             if "title" in metadata and metadata["source"].startswith("http"):
                 # HTML pages will be shown as links with a title
                 markdown_string = f"[{metadata['title']}]({metadata['source']})"
@@ -121,8 +121,11 @@ async def on_message(message: cl.Message) -> None:
 
     # Update the chat history
     chat_history.add_user_message(message.content)
-    chat_history.add_ai_message(ai_answer)
+    chat_history.add_ai_message(chunk["cited_answer"].get("answer", ""))
+
+    # Save things to the user session to be used for follow-up questions
     cl.user_session.set("chat_history", chat_history)
+    cl.user_session.set("chunks", retrieved_docs)
 
 
 if __name__ == "__main__":

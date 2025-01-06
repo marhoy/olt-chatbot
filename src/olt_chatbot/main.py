@@ -17,7 +17,7 @@ def update_retrievers() -> None:
     # Delete the old retriever databases
     logger.info("Deleting old retriever databases")
     if config.OUTPUT_DIRECTORY.exists():
-        shutil.rmtree(config.OUTPUT_DIRECTORY)
+        shutil.rmtree(config.OUTPUT_DIRECTORY, ignore_errors=True)
 
     # Create new retrievers
     update_retriever_databases()

@@ -35,11 +35,6 @@ class Settings(BaseSettings):
     def CHROMA_DB_PATH(self) -> str:  # noqa: D102, N802
         return str(self.OUTPUT_DIRECTORY / "chroma-db")
 
-    # BM25 Retriever
-    @property
-    def BM25_RETRIEVER_PATH(self) -> Path:  # noqa: D102, N802
-        return self.OUTPUT_DIRECTORY / "bm25-retriever.pkl"
-
     class Config:
         """Class configuration."""
 

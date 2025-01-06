@@ -13,25 +13,24 @@ authors = [
 dependencies = [
     "loguru >= 0.7.2",
     "python-dotenv >= 1.0.1",
-    "pydantic == 2.10.1",           # Pydantic 2.10.2/3 breaks chainlit
-    "langchain >= 0.3.7",
+    "pydantic == 2.10.1",           # Pydantic 2.10.2-4 breaks chainlit
     "langchain-community >= 0.3.7",
     "langchain-openai >= 0.2.8",
     "langchain-chroma >= 0.1.4",
-    "onnxruntime==1.19.2",          # onnxruntime 1.20.x doesn't exist for MacOS < 13
+    "onnxruntime >= 1.19.2",        # onnxruntime 1.20.x doesn't exist for MacOS < 13
     "beautifulsoup4 >= 4.12.3",
-    "rank-bm25 >= 0.2.2",
     "chainlit >= 1.3.2",
-    "pymupdf >= 1.24.13",
     "pypdf2 >= 3.0.1",
-    "pre-commit>=4.0.1",
+    # "rank-bm25 >= 0.2.2",
+    # "pymupdf >= 1.24.13",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.0.1",
+    "pre-commit >= 4.0.1",
     "types-beautifulsoup4 >= 4.12.0.20240229",
     "ipykernel >= 6.29.5",
+    "pipdeptree >= 2.23.1",
 ]
 
 # Define CLI commands

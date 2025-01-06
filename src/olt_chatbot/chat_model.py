@@ -9,7 +9,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import (
     Runnable,
     RunnableLambda,
-    RunnableParallel,
     RunnablePassthrough,
 )
 from loguru import logger
@@ -32,7 +31,7 @@ class CitedAnswer(BaseModel):
     )
     citations: list[str] = Field(
         ...,
-        description="The reference of the SPECIFIC source IDs which justify the answer.",  # noqa: E501
+        description="The UUID of the <ARTICLE> which justify the answer.",
     )
 
 
@@ -90,15 +89,32 @@ def get_chain_with_history(
 def format_docs_with_id(docs: list[Document]) -> str:
     """Format the retrieved documents with an enumerated ID."""
     formatted = [
-        (f"Source ID: {i}\nArticle Snippet: {doc.page_content}")
-        for i, doc in enumerate(docs)
+        (
+            f'<ARTICLE UUID="{doc.metadata["chunk_id"]}">\n'
+            f"\n{doc.page_content}"
+            "\n\n</ARTICLE>"
+        )
+        for doc in docs
     ]
     return "\n\n".join(formatted)
 
 
+def combine_docs(data: dict[str, Any]) -> list[Document]:
+    """Combine new and old docs, ignoring duplicates."""
+    old_docs = data.get("old_docs", [])
+    new_docs = data.get("new_docs", [])
+    combined_docs = {}
+    for doc in old_docs + new_docs:
+        chunk_id = doc.metadata.get("chunk_id", "")
+        if chunk_id not in combined_docs:
+            combined_docs[chunk_id] = doc
+
+    return list(combined_docs.values())
+
+
 def get_cited_rag_chain_for_streaming(
     llm_name: str = "gpt-4o-mini",
-) -> Runnable[str, dict[str, Any]]:
+) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Get the QA chain for Cited Answers."""
     llm = LLM_GENERATORS[llm_name]
     llm_with_tool = llm.bind_tools(
@@ -125,15 +141,14 @@ def get_cited_rag_chain_for_streaming(
                     "Here are the articles:\n\n{context}"
                 ),
             ),
+            MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{question}"),
         ]
     )
 
-    formatted_docs = itemgetter("docs") | RunnableLambda(format_docs_with_id)
-    answer_chain = prompt | llm_with_tool | output_parser
     return (
-        RunnableParallel(question=RunnablePassthrough(), docs=retriever)
-        .assign(context=formatted_docs)
-        .assign(cited_answer=answer_chain)
-        .pick(["cited_answer", "docs"])
+        RunnablePassthrough.assign(new_docs=itemgetter("question") | retriever)
+        .assign(docs=RunnableLambda(combine_docs))
+        .assign(context=itemgetter("docs") | RunnableLambda(format_docs_with_id))
+        .assign(cited_answer=prompt | llm_with_tool | output_parser)
     )

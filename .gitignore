@@ -4,3 +4,6 @@ output*
 
 # Ignore notebooks in the root directory
 /*.ipynb
+
+# Ignore auto-generated files
+.chainlit/translations/*
